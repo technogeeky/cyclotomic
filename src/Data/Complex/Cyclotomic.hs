@@ -76,6 +76,14 @@ module Data.Complex.Cyclotomic
     ,toComplex
     ,toReal
     ,toRat
+    -- added by dd
+    ,fromQ
+    ,fromZ
+    ,toZr1
+    ,toZrN
+    -- higher square roots
+    ,sqrt3
+    ,sqrt5
     )
     where
 
@@ -89,6 +97,16 @@ import Math.NumberTheory.Primes.Factorisation (factorise)
 data Cyclotomic = Cyclotomic { order  :: Integer
                              , coeffs :: M.Map Integer Rational
                              } deriving (Eq)
+
+fromQ :: Rational -> Cyclotomic
+fromZ :: Integral a => a -> Cyclotomic
+toZr1 :: Cyclotomic
+toZrN :: Integer -> Cyclotomic
+
+fromQ r = Cyclotomic 1                   (M.singleton 0 r               )
+fromZ n = Cyclotomic 1                   (M.singleton 0 (fromIntegral n))
+toZr1   = Cyclotomic 1                   (M.singleton 0 1               )
+toZrN n = cyclotomic n $ convertToBase n (M.singleton 1 1               )
 
 -- | @signum c@ is the complex number with magnitude 1 that has the same argument as c;
 --   @signum c = c / abs c@.
@@ -104,7 +122,7 @@ instance Num Cyclotomic where
     fromInteger     n    = Cyclotomic 1 (M.singleton 0 (fromIntegral n))
 
 instance Fractional Cyclotomic where
-    recip = invCyc
+    recip          = invCyc
     fromRational 0 = zeroCyc
     fromRational r = Cyclotomic 1 (M.singleton 0 r)
 
@@ -118,24 +136,42 @@ e n
     | n == 1     = Cyclotomic 1 (M.singleton 0 1)
     | otherwise  = cyclotomic n $ convertToBase n (M.singleton 1 1)
 
+convertToBase :: Integer -> M.Map Integer Rational -> M.Map Integer Rational
+convertToBase n mp = foldr (\(p,r) m -> replace n p r m) mp (extraneousPowers n)
+
+
+ee :: Integer -> Cyclotomic
+ee n
+    | n < 1      = error "e requires a positive integer"
+    | n == 1     = Cyclotomic 4                   (M.singleton 0 2)
+    | otherwise  = cyclotomic n $ convertToBase n (M.singleton 2 4)
+
 instance Show Cyclotomic where
     show (Cyclotomic n mp)
         | mp == M.empty  = "0"
         | otherwise      = leadingTerm rat n ex ++ followingTerms n xs
         where ((ex,rat):xs) = M.toList mp
 
+{-
 showBaseExp :: Integer -> Integer -> String
-showBaseExp n 1  = "e(" ++ show n ++ ")"
-showBaseExp n ex = "e(" ++ show n ++ ")^" ++ show ex
+showBaseExp n 1  = " e( " ++ show n ++ " )  "
+showBaseExp n ex = " e( " ++ show n ++ " )^ " ++ show ex
+-}
 
+showBaseExp :: Integer -> Integer -> String
+showBaseExp n 1  =              " (e " ++ show n ++ ")  "
+showBaseExp n ex =              " (e " ++ show n ++ ")^ " ++ show ex
+
+-- this careful spacing still fails because
+-- the dynamic part of the layout (showRat r) doesn't report the 
 leadingTerm :: Rational -> Integer -> Integer -> String
 leadingTerm r _ 0 = showRat r
 leadingTerm r n ex
-    | r == 1     = t
-    | r == (-1)  = "-" ++ t
-    | r > 0      = showRat r ++ "*" ++ t
-    | r < 0      = "-" ++ showRat (abs r) ++ "*" ++ t
-    | otherwise  = ""
+    | r ==   1   = "\t   \t"                    ++ "\t   \t" ++ t ++ "\n"
+    | r == (-1)  = "\t - \t"                    ++ "\t   \t" ++ t ++ "\n"
+    | r > 0      = "\t + \t" ++ showRat      r  ++ "\t * \t" ++ t ++ "\n"
+    | r < 0      = "\t - \t" ++ showRat (abs r) ++ "\t * \t" ++ t ++ "\n"
+    | otherwise  =                               "#####"
     where t = showBaseExp n ex
 
 followingTerms :: Integer -> [(Integer,Rational)] -> String
@@ -144,11 +180,11 @@ followingTerms n ((ex,rat):xs) = followingTerm rat n ex ++ followingTerms n xs
 
 followingTerm :: Rational -> Integer -> Integer -> String
 followingTerm r n ex
-    | r == 1     = " + " ++ t
-    | r == (-1)  = " - " ++ t
-    | r > 0      = " + " ++ showRat r ++ "*" ++ t
-    | r < 0      = " - " ++ showRat (abs r) ++ "*" ++ t
-    | otherwise  = ""
+    | r ==   1   = "\t + \t"                    ++  "\t   \t" ++ t ++ "\n"
+    | r == (-1)  = "\t - \t"                    ++  "\t   \t" ++ t ++ "\n"
+    | r > 0      = "\t + \t" ++ showRat      r  ++  "\t * \t" ++ t ++ "\n"
+    | r < 0      = "\t - \t" ++ showRat (abs r) ++  "\t * \t" ++ t ++ "\n"
+    | otherwise  = "\t   \t"
     where t = showBaseExp n ex
 
 showRat :: Rational -> String
@@ -169,7 +205,12 @@ eb n
                         in sum [en^(k*k `mod` n) | k <- [1..(n-1) `div` 2]]
 
 sqrt2 :: Cyclotomic
-sqrt2 = e 8 - e 8 ^ (3 :: Int)
+sqrt3 :: Cyclotomic
+sqrt5 :: Cyclotomic
+
+sqrt2 = e  8               -  e 8  ^ ( 3 :: Int)
+sqrt3 = e 12 ^ (11 :: Int) -  e 12 ^ ( 7 :: Int)  
+sqrt5 = (e 5) - (e 5)^(2 :: Int) - (e 5)^(3 :: Int) + (e 5)^(4 :: Int)
 
 -- | The square root of an 'Integer'.
 sqrtInteger :: Integer -> Cyclotomic
@@ -232,8 +273,6 @@ modSq z = case toRat (z * conj z) of
             Just msq -> msq
             Nothing  -> error $ "modSq:  tried z = " ++ show z
 
-convertToBase :: Integer -> M.Map Integer Rational -> M.Map Integer Rational
-convertToBase n mp = foldr (\(p,r) m -> replace n p r m) mp (extraneousPowers n)
 
 removeZeros :: M.Map Integer Rational -> M.Map Integer Rational
 removeZeros = M.filter (/= 0)
@@ -361,7 +400,7 @@ prodRatCyc r (Cyclotomic ord mp) = Cyclotomic ord $ M.map (r*) mp
 
 -- | Additive identity.
 zeroCyc :: Cyclotomic
-zeroCyc = Cyclotomic 1 (M.empty)
+zeroCyc = Cyclotomic (1) (M.empty)
 
 -- | Additive inverse.
 aInvCyc :: Cyclotomic -> Cyclotomic
