@@ -56,7 +56,7 @@
      gap4r4\/lib\/cyclotom.gi).
 -}
 
-module Data.Complex.CZ
+module Data.Complex.Cyclotomic
     (CZ
     ,i
     ,e
@@ -183,11 +183,6 @@ ee n
     | n == 1     = CZ 4                           (M.singleton 0 2)
     | otherwise  = cyclotomic n $ convertToBase n (M.singleton 2 4)
 
-instance Show CZ where
-    show c@(CZ n mp)
-        | mp == M.empty  = "000"
-        | otherwise      = leadingTerm c rat n ex ++ followingTerms c n xs
-        where ((ex,rat):xs) = M.toList mp
 
 {-
 showBaseExp :: Integer -> Integer -> String
@@ -199,8 +194,14 @@ showBaseExp :: Integer -> Integer -> String
 showBaseExp n 1  =              " (e " ++ show n ++ ")  "
 showBaseExp n ex =              " (e " ++ show n ++ ")^ " ++ show ex
 
+instance Show CZ where
+    show c@(CZ n mp)
+        | mp == M.empty  = "000"
+        | otherwise      = leadingTerm c rat n ex ++ followingTerms c n xs
+        where ((ex,rat):xs) = M.toList mp
+
 -- this careful spacing still fails because
--- the dynamic part of the layout (showRat r) doesn't report the 
+-- the dynamic part of the layout (showRat r) doesn't report the text width.
 leadingTerm :: CZ -> Rational -> Integer -> Integer -> String
 leadingTerm _ r _ 0 = showRat r
 leadingTerm _ r n ex
@@ -216,22 +217,23 @@ followingTerms c _ [        ]    =
                               "\n" ++ "\t is      real?    : \t" ++ show (isReal            c )     ++ 
                               "\n" ++ "\t is       rat?    : \t" ++ show (isRat             c )     ++ 
                               "\n" ++ "\t is Gauss rat?    : \t" ++ show (isGaussianRat     c )     ++ 
-                              "\n" ++ "\t rational     form: \t\t" ++ show (toRat           c )     ++ 
-                              "\n" ++ "\t i = sqrt(-1) form: \t\t" ++ show (toComplex2       c )     ++
-                              "\n" ++ "\t i = sqrt(-3) form: \t\t" ++ show (toComplex3       c )     ++
+                              "\n" ++ "\t rational      form: \t\t" ++ show (toRat           c )     ++ 
+                              "\n" ++ "\t i = sqrt(-01) form: \t\t" ++ show (toComplex2       c )     ++
+                              "\n" ++ "\t i = sqrt(-03) form: \t\t" ++ show (toComplex3       c )     ++
+                              "\n" ++ "\t i = sqrt(-23) form: \t\t" ++ show (toComplex23      c )     ++
                               "\n" ++ "\t conjugate    form: \t\t" ++ show (toComplex2 (conj   c))     ++ 
                               "\n" ++ "\t (+) <-> (-)  form: \t\t" ++ show (toComplex2 (aInv_1_CZ (negate c)))    ++    -- could fail, so it must go last?
                               "\n" ++ "\t (*) <-> (/)  form: \t\t" ++ show (toComplex2 (mInv_2_CZ c))              
 
 
 
-followingTerms c n ((ex,rat):xs) = followingTerm rat n ex ++ followingTerms c n xs
+followingTerms c n ((ex,rat):xs) = followingTerm c rat n ex ++ followingTerms c n xs
 
-followingTerm :: Rational -> Integer -> Integer -> String
-followingTerm r n ex
+followingTerm :: CZ -> Rational -> Integer -> Integer -> String
+followingTerm c r n ex
     | r ==   1   = "\t + \t"                    ++  "\t   \t" ++ t ++ "\n"
     | r == (-1)  = "\t - \t"                    ++  "\t   \t" ++ t ++ "\n"
-    | r > 0      = "\t + \t" ++ showRat      r  ++  "\t * \t" ++ t ++ "\n"
+    | r > 0      = "\t + \t" ++ showRat      r  ++  "\t * \t" ++ t ++ "\n" 
     | r < 0      = "\t - \t" ++ showRat (abs r) ++  "\t * \t" ++ t ++ "\n"
     | otherwise  = "\t   \t"
     where t = showBaseExp n ex
@@ -282,9 +284,9 @@ rr2 = sqrt2 -- silver ratio - 1  (aka, we're setting 1 equal to the silver ratio
 --
 --  
 
-light   = negate (1 /12) + (1/12) * ir23
-medium  = negate (13/24) + (1/24) * ir23
-heavy   = negate (25/36) + (1/36) * ir23
+light   = negate (1 /(-12)) + (1/(-12)) * ir23
+medium  = negate (13/(-24)) + (1/24) * ir23
+heavy   = negate (25/(-36)) + (1/36) * ir23
 
 
 
@@ -345,6 +347,8 @@ sqrt043 = sqrtInteger (-43)
 sqrt067 = sqrtInteger (-67)
 sqrt163 = sqrtInteger (-163)
 
+
+sqrt023 = sqrtInteger (-23)
 
 -- | Make a Gaussian rational; @gaussianRat p q@ is the same as @p + q * i@.
 gaussianRat :: Rational -> Rational -> CZ
@@ -539,6 +543,12 @@ mInv_2_CZ    :: CZ -> CZ
 
 mInv_2_CZ  z = prodRatCyc (2 / modSq z) (conj z)
 mInv_3_CZ  z = prodRatCyc (3 / modSq z) (conj z)
+mInv_6_CZ  z = prodRatCyc (6 / modSq z) (conj z)
+mInv_12_CZ  z = prodRatCyc (12/ modSq z) (conj z)
+
+mInv_23_CZ  z = prodRatCyc (23 / modSq z) (conj z)
+mInv_24_CZ  z = prodRatCyc (24 / modSq z) (conj z)
+
 aInv_1_CZ  z = prodRatCyc (-1)          (     z)
 
 -- | Is the cyclotomic a real number?
@@ -570,6 +580,10 @@ toComplex2 c = sum [fromRational r * en^p | (p,r) <- M.toList (coeffs c)]
 
 toComplex3 c = sum [fromRational r * en^p | (p,r) <- M.toList (coeffs c)]
     where en = exp (0 :+ 2*pi/(3*n))
+          n = fromIntegral (order c)
+
+toComplex23 c = sum [fromRational r * en^p | (p,r) <- M.toList (coeffs c)]
+    where en = exp (0 :+ 2*pi/(24*n))
           n = fromIntegral (order c)
 
 -- | Export as an inexact real number if possible.

@@ -24,3 +24,4 @@ Library
                        containers >= 0.3 && < 0.5,
                        arithmoi >= 0.4 && < 0.5
   Hs-source-dirs:      src
+  ghc-options:         -O2
